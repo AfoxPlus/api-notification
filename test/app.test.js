@@ -16,6 +16,36 @@ function createTestApp({ documents, verifyIdToken, messaging } = {}) {
 }
 
 describe("HTTP API", () => {
+  test("serves the OpenAPI document without authentication", async () => {
+    const { app } = createTestApp();
+
+    const response = await request(app).get("/api-docs.json").expect(200);
+
+    expect(response.body.openapi).toBe("3.0.3");
+    expect(response.body.components.securitySchemes.bearerAuth).toMatchObject({
+      type: "http",
+      scheme: "bearer",
+      bearerFormat: "Firebase ID Token",
+    });
+    expect(response.body.paths).toEqual(
+      expect.objectContaining({
+        "/health": expect.any(Object),
+        "/api/tokens/register": expect.any(Object),
+        "/api/tokens/remove": expect.any(Object),
+        "/api/notifications/send": expect.any(Object),
+      }),
+    );
+  });
+
+  test("serves Swagger UI without authentication", async () => {
+    const { app } = createTestApp();
+
+    const response = await request(app).get("/api-docs").expect(301);
+
+    expect(response.headers.location).toBe("/api-docs/");
+    await request(app).get("/api-docs/").expect(200).expect("Content-Type", /html/);
+  });
+
   test("reports service health without authentication", async () => {
     const { app } = createTestApp();
 

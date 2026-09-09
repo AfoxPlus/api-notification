@@ -40,6 +40,8 @@ npm run lint
 
 Las rutas protegidas requieren `Authorization: Bearer <Firebase ID Token>`. El uid siempre se extrae de ese token.
 
+La documentacion interactiva esta disponible en [`/api-docs`](http://localhost:3000/api-docs) y la especificacion OpenAPI JSON en [`/api-docs.json`](http://localhost:3000/api-docs.json) cuando el servidor esta en ejecucion. Usa el boton **Authorize** de Swagger UI para proporcionar un Firebase ID Token antes de probar las rutas protegidas.
+
 ### `GET /health`
 
 Devuelve `{ "status": "ok" }` y no requiere autenticacion.
