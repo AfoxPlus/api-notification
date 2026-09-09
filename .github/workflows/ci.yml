@@ -26,8 +26,12 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/serviceAccountKey.json
     steps:
       - uses: actions/checkout@v4
+      - name: Decode Google credentials
+        run: echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}" | base64 -d > "$GOOGLE_APPLICATION_CREDENTIALS"
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
