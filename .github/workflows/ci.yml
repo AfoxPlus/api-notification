@@ -31,7 +31,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Decode Google credentials
-        run: echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}" | base64 -d > "$GOOGLE_APPLICATION_CREDENTIALS"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_SECRET: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+        run: |
+          if [ -z "$GOOGLE_APPLICATION_CREDENTIALS_SECRET" ]; then
+            echo "::error::Missing GOOGLE_APPLICATION_CREDENTIALS secret"
+            exit 1
+          fi
+
+          if printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_SECRET" | base64 --decode > "$GOOGLE_APPLICATION_CREDENTIALS" 2>/dev/null \
+            && python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$GOOGLE_APPLICATION_CREDENTIALS" 2>/dev/null; then
+            echo "Loaded base64-encoded Google credentials"
+          else
+            printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_SECRET" > "$GOOGLE_APPLICATION_CREDENTIALS"
+            python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$GOOGLE_APPLICATION_CREDENTIALS" >/dev/null
+            echo "Loaded plain JSON Google credentials"
+          fi
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
