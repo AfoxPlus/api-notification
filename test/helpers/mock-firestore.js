@@ -47,11 +47,36 @@ function createMockFirestore(initialDocuments = {}) {
     };
   }
 
+  function query(name, predicate, limitCount) {
+    return {
+      limit(count) {
+        return query(name, predicate, count);
+      },
+      async get() {
+        const prefix = `${name}/`;
+        const docs = [...documents.entries()]
+          .filter(([path]) => path.startsWith(prefix))
+          .map(([path, value]) => ({ id: path.slice(prefix.length), data: () => structuredClone(value) }))
+          .filter((doc) => predicate(doc.data()))
+          .slice(0, limitCount ?? Infinity);
+
+        return { empty: docs.length === 0, docs };
+      },
+    };
+  }
+
   return {
     collection(name) {
       return {
         doc(id) {
           return documentReference(`${name}/${id}`);
+        },
+        where(field, op, value) {
+          if (op !== "==") {
+            throw new Error(`Unsupported operator: ${op}`);
+          }
+
+          return query(name, (data) => data[field] === value);
         },
       };
     },

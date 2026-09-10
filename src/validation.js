@@ -25,10 +25,15 @@ const removeTokenSchema = z.object({
 });
 
 const notificationSchema = z.object({
-  toUserId: z.string().trim().min(1).max(128),
-  title: z.string().trim().min(1).max(200),
-  body: z.string().trim().min(1).max(4096),
-  data: z.record(z.string().max(128), z.string().max(1024)).optional(),
+  phoneNumbers: z
+    .array(z.string().trim().regex(E164_PATTERN, "Each phone number must use E.164 format."))
+    .min(1)
+    .max(100),
+  message: z.string().trim().min(1).max(4096),
+  coordinates: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
 });
 
 function parseBody(schema, body) {

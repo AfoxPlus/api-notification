@@ -119,4 +119,55 @@ describe("HTTP API", () => {
     expect(firestore.get("users/sender").fcmTokens).toEqual(["keep"]);
     expect(firestore.get("users/recipient").fcmTokens).toEqual(["remove"]);
   });
+
+  test("sends notifications to each phone number and reports per-number status", async () => {
+    const messaging = {
+      sendEachForMulticast: jest.fn().mockResolvedValue({
+        successCount: 1,
+        responses: [{ success: true }],
+      }),
+    };
+    const { app } = createTestApp({
+      documents: {
+        "users/recipient": { mobileNumber: "+51999999999", fcmTokens: ["device-token"] },
+      },
+      messaging,
+    });
+
+    const response = await request(app)
+      .post("/api/notifications/send")
+      .set("Authorization", "Bearer valid-id-token")
+      .send({
+        phoneNumbers: ["+51999999999", "+51888888888"],
+        message: "Se reporta una emergencia",
+        coordinates: { lat: -12.05, lng: -77.04 },
+      })
+      .expect(200);
+
+    expect(response.body).toEqual({
+      attemptedCount: 2,
+      sentCount: 1,
+      removedTokenCount: 0,
+      results: [
+        { phoneNumber: "+51999999999", status: "sent", sentCount: 1, removedTokenCount: 0 },
+        { phoneNumber: "+51888888888", status: "user_not_found", sentCount: 0, removedTokenCount: 0 },
+      ],
+    });
+  });
+
+  test("rejects a notification send with an invalid phone number", async () => {
+    const { app } = createTestApp();
+
+    const response = await request(app)
+      .post("/api/notifications/send")
+      .set("Authorization", "Bearer valid-id-token")
+      .send({
+        phoneNumbers: ["999999999"],
+        message: "Se reporta una emergencia",
+        coordinates: { lat: -12.05, lng: -77.04 },
+      })
+      .expect(400);
+
+    expect(response.body.error).toBe("Invalid request body.");
+  });
 });

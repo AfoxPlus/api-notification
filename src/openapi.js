@@ -67,26 +67,53 @@ const openapiDocument = {
       },
       SendNotificationRequest: {
         type: "object",
-        required: ["toUserId", "title", "body"],
+        required: ["phoneNumbers", "message", "coordinates"],
         properties: {
-          toUserId: { type: "string", minLength: 1, maxLength: 128 },
-          title: { type: "string", minLength: 1, maxLength: 200 },
-          body: { type: "string", minLength: 1, maxLength: 4096 },
-          data: {
-            type: "object",
-            description: "String keys of up to 128 characters with string values of up to 1024 characters.",
-            additionalProperties: { type: "string", maxLength: 1024 },
-            example: { chatId: "123" },
+          phoneNumbers: {
+            type: "array",
+            minItems: 1,
+            maxItems: 100,
+            items: {
+              type: "string",
+              pattern: "^\\+[1-9]\\d{1,14}$",
+              example: "+51999999999",
+            },
           },
+          message: { type: "string", minLength: 1, maxLength: 4096 },
+          coordinates: {
+            type: "object",
+            required: ["lat", "lng"],
+            properties: {
+              lat: { type: "number", minimum: -90, maximum: 90 },
+              lng: { type: "number", minimum: -180, maximum: 180 },
+            },
+          },
+        },
+      },
+      SendNotificationResult: {
+        type: "object",
+        required: ["phoneNumber", "status", "sentCount", "removedTokenCount"],
+        properties: {
+          phoneNumber: { type: "string", example: "+51999999999" },
+          status: {
+            type: "string",
+            enum: ["sent", "failed", "user_not_found", "no_tokens"],
+          },
+          sentCount: { type: "integer", minimum: 0 },
+          removedTokenCount: { type: "integer", minimum: 0 },
         },
       },
       SendNotificationResponse: {
         type: "object",
-        required: ["attemptedCount", "sentCount", "removedTokenCount"],
+        required: ["attemptedCount", "sentCount", "removedTokenCount", "results"],
         properties: {
           attemptedCount: { type: "integer", minimum: 0 },
           sentCount: { type: "integer", minimum: 0 },
           removedTokenCount: { type: "integer", minimum: 0 },
+          results: {
+            type: "array",
+            items: { $ref: "#/components/schemas/SendNotificationResult" },
+          },
         },
       },
     },
@@ -187,9 +214,11 @@ const openapiDocument = {
     },
     "/api/notifications/send": {
       post: {
-        summary: "Send a push notification",
+        summary: "Send a push notification to a list of phone numbers",
         description:
-          "Sends to every registered recipient device and removes invalid or expired FCM tokens.",
+          "Looks up the registered user for each phone number and sends a push notification with the given " +
+          "message and coordinates to all of their devices, removing invalid or expired FCM tokens. Phone " +
+          "numbers with no registered user or tokens are reported per-item instead of failing the whole request.",
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -210,18 +239,6 @@ const openapiDocument = {
           },
           400: { $ref: "#/components/responses/BadRequest" },
           401: { $ref: "#/components/responses/Unauthorized" },
-          404: {
-            description: "Recipient user does not exist.",
-            content: {
-              "application/json": { schema: { $ref: "#/components/schemas/Error" } },
-            },
-          },
-          409: {
-            description: "Recipient has no registered device tokens.",
-            content: {
-              "application/json": { schema: { $ref: "#/components/schemas/Error" } },
-            },
-          },
           429: {
             description: "Notification rate limit exceeded.",
             content: {
