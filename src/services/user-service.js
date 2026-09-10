@@ -2,24 +2,24 @@ const { AppError } = require("../errors");
 
 function createUserService(firestore) {
   const users = firestore.collection("users");
-  const usernameClaims = firestore.collection("usernames");
+  const mobileNumberClaims = firestore.collection("mobileNumbers");
 
   async function registerToken({ uid, token, mobileNumber, username }) {
     const userRef = users.doc(uid);
-    const usernameRef = usernameClaims.doc(username);
+    const mobileNumberRef = mobileNumberClaims.doc(mobileNumber);
 
     await firestore.runTransaction(async (transaction) => {
-      const [userSnapshot, usernameSnapshot] = await Promise.all([
+      const [userSnapshot, mobileNumberSnapshot] = await Promise.all([
         transaction.get(userRef),
-        transaction.get(usernameRef),
+        transaction.get(mobileNumberRef),
       ]);
 
-      if (usernameSnapshot.exists && usernameSnapshot.data().uid !== uid) {
-        throw new AppError(409, "username is already in use.");
+      if (mobileNumberSnapshot.exists && mobileNumberSnapshot.data().uid !== uid) {
+        throw new AppError(409, "mobileNumber is already in use.");
       }
 
       const currentUser = userSnapshot.exists ? userSnapshot.data() : {};
-      const previousUsername = currentUser.username;
+      const previousMobileNumber = currentUser.mobileNumber;
       const fcmTokens = [...new Set([...(currentUser.fcmTokens || []), token])];
       const now = new Date();
 
@@ -28,10 +28,10 @@ function createUserService(firestore) {
         { fcmTokens, mobileNumber, username, updatedAt: now },
         { merge: true },
       );
-      transaction.set(usernameRef, { uid, updatedAt: now });
+      transaction.set(mobileNumberRef, { uid, updatedAt: now });
 
-      if (previousUsername && previousUsername !== username) {
-        transaction.delete(usernameClaims.doc(previousUsername));
+      if (previousMobileNumber && previousMobileNumber !== mobileNumber) {
+        transaction.delete(mobileNumberClaims.doc(previousMobileNumber));
       }
     });
   }
@@ -69,6 +69,17 @@ function createUserService(firestore) {
     return snapshot.data();
   }
 
+  async function getRecipientByMobileNumber(mobileNumber) {
+    const snapshot = await users.where("mobileNumber", "==", mobileNumber).limit(1).get();
+
+    if (snapshot.empty) {
+      return null;
+    }
+
+    const [doc] = snapshot.docs;
+    return { uid: doc.id, ...doc.data() };
+  }
+
   async function removeTokens(uid, tokensToRemove) {
     if (tokensToRemove.length === 0) {
       return 0;
@@ -96,7 +107,7 @@ function createUserService(firestore) {
     });
   }
 
-  return { getRecipient, registerToken, removeToken, removeTokens };
+  return { getRecipient, getRecipientByMobileNumber, registerToken, removeToken, removeTokens };
 }
 
 module.exports = { createUserService };
